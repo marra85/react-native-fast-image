@@ -57,18 +57,20 @@
 		"preset": "react-native"
 	},
 	"resolutions": {
-		"jest": "^27.5",
-		"jest-environment-node": "^27.5",
-		"@jest/create-cache-key-function": "^27"
+		"jest": "^27.5.1",
+		"jest-environment-node": "^27.5.1",
+		"@jest/create-cache-key-function": "^27.5.1"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.14.6",
-		"@babel/runtime": "^7.14.6",
-		"@types/jest": "^27.5",
+		"@babel/core": "^7.22.15",
+		"@babel/preset-env": "^7.22.15",
+		"@babel/runtime": "^7.22.15",
+		"@types/jest": "27.5.2",
 		"@types/react": "18.2.21",
 		"@types/react-dom": "18.2.7",
 		"@types/react-native": "0.72.2",
-		"@types/react-test-renderer": "^18.0.0",
+		"@types/react-test-renderer": "^18.0.1",
+		"babel-eslint": "^10.1.0",
 		"dv-scripts": "^1.6.1",
 		"eslint-config-dv-scripts": "^1.1.1",
 		"metro-react-native-babel-preset": "^0.76.7",
