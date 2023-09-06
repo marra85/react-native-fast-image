@@ -30,6 +30,7 @@ class FastImageViewWithUrl extends AppCompatImageView {
     private boolean mNeedsReload = false;
     private ReadableMap mSource = null;
     private Drawable mDefaultSource = null;
+	private Integer mBlurRadius = null;
 
     public GlideUrl glideUrl;
 
@@ -46,6 +47,10 @@ class FastImageViewWithUrl extends AppCompatImageView {
         mNeedsReload = true;
         mDefaultSource = source;
     }
+
+	public void setBlurRadius(@Nullable Integer blurRadius) {
+		mBlurRadius = blurRadius;
+	}
 
     private boolean isNullOrEmpty(final String url) {
         return url == null || url.trim().isEmpty();
@@ -105,7 +110,7 @@ class FastImageViewWithUrl extends AppCompatImageView {
         this.glideUrl = glideUrl;
         clearView(requestManager);
 
-        String key = glideUrl == null ? null : glideUrl.toStringUrl();
+        final String key = glideUrl == null ? null : glideUrl.getCacheKey();
 
         if (glideUrl != null) {
             FastImageOkHttpProgressGlideModule.expect(key, manager);
@@ -129,31 +134,33 @@ class FastImageViewWithUrl extends AppCompatImageView {
                     new WritableNativeMap());
         }
 
-        if (requestManager != null) {
-            RequestBuilder<Drawable> builder =
-                    requestManager
-                            // This will make this work for remote and local images. e.g.
-                            //    - file:///
-                            //    - content://
-                            //    - res:/
-                            //    - android.resource://
-                            //    - data:image/png;base64
-                            .load(imageSource == null ? null : imageSource.getSourceForLoad())
-                            .apply(FastImageViewConverter
-                                    .getOptions(context, imageSource, mSource)
-                                    .placeholder(mDefaultSource) // show until loaded
-                                    .fallback(mDefaultSource)); // null will not be treated as error
+		if (requestManager != null) {
+			RequestBuilder<Drawable> builder =
+				requestManager
+					// This will make this work for remote and local images. e.g.
+					//    - file:///
+					//    - content://
+					//    - res:/
+					//    - android.resource://
+					//    - data:image/png;base64
+					.load(imageSource == null ? null : imageSource.getSourceForLoad())
+					.apply(FastImageViewConverter
+						.getOptions(context, imageSource, mSource, mBlurRadius)
+						.placeholder(mDefaultSource)
+						.fallback(mDefaultSource));
 
-            if (key != null)
-                builder.listener(new FastImageRequestListener(key));
+			if (key != null) {
+				builder.listener(new FastImageRequestListener(key));
+			}
 
-            builder.into(this);
-        }
-    }
+			builder.into(this);
+		}
+	}
 
     public void clearView(@Nullable RequestManager requestManager) {
         if (requestManager != null && getTag() != null && getTag() instanceof Request) {
             requestManager.clear(this);
         }
     }
+
 }
