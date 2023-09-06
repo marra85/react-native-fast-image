@@ -6,7 +6,6 @@ import {
 	Image,
 	ImageRequireSource,
 	LayoutChangeEvent,
-	NativeModules,
 	Platform,
 	ShadowStyleIOS,
 	StyleProp,

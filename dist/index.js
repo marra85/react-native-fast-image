@@ -1,6 +1,6 @@
 import _extends from '@babel/runtime/helpers/extends';
 import React, { forwardRef, memo } from 'react';
-import { NativeModules, NativeEventEmitter, Platform, StyleSheet, requireNativeComponent, Image, View } from 'react-native';
+import { NativeModules, NativeEventEmitter, StyleSheet, requireNativeComponent, Image, View, Platform } from 'react-native';
 
 const nativeManager = NativeModules.FastImagePreloaderManager;
 const nativeEmitter = new NativeEventEmitter(nativeManager);
@@ -53,7 +53,6 @@ class PreloaderManager {
 }
 const preloaderManager = new PreloaderManager();
 
-const FastImageViewNativeModule = Platform.OS === 'ios' ? preloaderManager : NativeModules.FastImageView;
 const resizeMode = {
   contain: 'contain',
   cover: 'cover',
@@ -159,9 +158,9 @@ const FastImage = FastImageComponent;
 FastImage.resizeMode = resizeMode;
 FastImage.cacheControl = cacheControl;
 FastImage.priority = priority;
-FastImage.preload = (sources, onProgress, onComplete) => FastImageViewNativeModule.preload(sources, onProgress, onComplete);
-FastImage.clearMemoryCache = () => FastImageViewNativeModule.clearMemoryCache();
-FastImage.clearDiskCache = () => FastImageViewNativeModule.clearDiskCache();
+FastImage.preload = (sources, onProgress, onComplete) => preloaderManager.preload(sources, onProgress, onComplete);
+FastImage.clearMemoryCache = () => preloaderManager.clearMemoryCache();
+FastImage.clearDiskCache = () => preloaderManager.clearDiskCache();
 const styles = StyleSheet.create({
   imageContainer: {
     overflow: 'hidden'

@@ -60,7 +60,6 @@ class PreloaderManager {
 }
 const preloaderManager = new PreloaderManager();
 
-const FastImageViewNativeModule = reactNative.Platform.OS === 'ios' ? preloaderManager : reactNative.NativeModules.FastImageView;
 const resizeMode = {
   contain: 'contain',
   cover: 'cover',
@@ -166,9 +165,9 @@ const FastImage = FastImageComponent;
 FastImage.resizeMode = resizeMode;
 FastImage.cacheControl = cacheControl;
 FastImage.priority = priority;
-FastImage.preload = (sources, onProgress, onComplete) => FastImageViewNativeModule.preload(sources, onProgress, onComplete);
-FastImage.clearMemoryCache = () => FastImageViewNativeModule.clearMemoryCache();
-FastImage.clearDiskCache = () => FastImageViewNativeModule.clearDiskCache();
+FastImage.preload = (sources, onProgress, onComplete) => preloaderManager.preload(sources, onProgress, onComplete);
+FastImage.clearMemoryCache = () => preloaderManager.clearMemoryCache();
+FastImage.clearDiskCache = () => preloaderManager.clearDiskCache();
 const styles = reactNative.StyleSheet.create({
   imageContainer: {
     overflow: 'hidden'
