@@ -1,4 +1,5 @@
 #import "FFFastImageViewManager.h"
+#import "FFFastImageIgnoreURLParamsMapper.h"
 #import "FFFastImageView.h"
 
 #import <SDWebImage/SDImageCache.h>
@@ -20,6 +21,7 @@ RCT_EXPORT_VIEW_PROPERTY(onFastImageProgress, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onFastImageError, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onFastImageLoad, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onFastImageLoadEnd, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(blurRadius, CGFloat)
 RCT_REMAP_VIEW_PROPERTY(tintColor, imageColor, UIColor)
 
 RCT_EXPORT_METHOD(preload:(nonnull NSArray<FFFastImageSource *> *)sources)
@@ -44,6 +46,7 @@ RCT_EXPORT_METHOD(clearMemoryCache:(RCTPromiseResolveBlock)resolve reject:(RCTPr
 
 RCT_EXPORT_METHOD(clearDiskCache:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 {
+    [FFFastImageIgnoreURLParamsMapper.shared clear];
     [SDImageCache.sharedImageCache clearDiskOnCompletion:^(){
         resolve(NULL);
     }];

@@ -1,6 +1,9 @@
 #import "FFFastImageView.h"
+#import "FFFastImageIgnoreURLParamsMapper.h"
+#import "FFFastImageImageFetchStore.h"
 #import <SDWebImage/UIImage+MultiFormat.h>
 #import <SDWebImage/UIView+WebCache.h>
+#import <CoreImage/CoreImage.h>
 
 @interface FFFastImageView ()
 
@@ -71,17 +74,36 @@
     }
 }
 
+- (void)setBlurRadius:(CGFloat)blurRadius {
+    if (_blurRadius != blurRadius) {
+        _blurRadius = blurRadius;
+        _needsReload = YES;
+    }
+}
+
 - (UIImage*) makeImage: (UIImage*)image withTint: (UIColor*)color {
     UIImage* newImage = [image imageWithRenderingMode: UIImageRenderingModeAlwaysTemplate];
-    UIGraphicsBeginImageContextWithOptions(image.size, NO, newImage.scale);
-    [color set];
-    [newImage drawInRect: CGRectMake(0, 0, image.size.width, newImage.size.height)];
-    newImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    return newImage;
+
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:image.size format:format];
+
+    UIImage *resultImage = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
+        CGRect rect = CGRectMake(0, 0, image.size.width, image.size.height);
+        [color set];
+        [newImage drawInRect:rect];
+    }];
+
+    return resultImage;
 }
 
 - (void) setImage: (UIImage*)image {
+    if (_blurRadius && _blurRadius > 0) {
+        UIImage *blurImage = [self blurImage: image withRadius: _blurRadius];
+        if (blurImage) {
+            image = blurImage;
+        }
+    }
+
     if (self.imageColor != nil) {
         super.image = [self makeImage: image withTint: self.imageColor];
     } else {
@@ -150,6 +172,27 @@
             return;
         }
 
+        if (_source.url != nil) {
+            if (_source.cacheKeyIgnoreURLParams) {
+            [[FFFastImageIgnoreURLParamsMapper shared] add:_source.url];
+            } else {
+                [[FFFastImageIgnoreURLParamsMapper shared] remove:_source.url];
+            }
+        }
+
+        NSString *cacheKey = [[SDWebImageManager sharedManager] cacheKeyForURL:_source.url];
+        UIImage *cachedImage = [[SDImageCache sharedImageCache] imageFromCacheForKey:cacheKey];
+        if (cachedImage) {
+            // If the image is in the cache, use it directly
+            [self setImage:cachedImage];
+            self.hasCompleted = YES;
+            [self sendOnLoad:cachedImage];
+            if (self.onFastImageLoadEnd) {
+                self.onFastImageLoadEnd(@{});
+            }
+            return;
+        }
+
         // Set headers.
         NSDictionary* headers = _source.headers;
         SDWebImageDownloaderRequestModifier* requestModifier = [SDWebImageDownloaderRequestModifier requestModifierWithBlock: ^NSURLRequest* _Nullable (NSURLRequest* _Nonnull request) {
@@ -176,6 +219,7 @@
                 break;
         }
 
+        // Set cache.
         switch (_source.cacheControl) {
             case FFFCacheControlWeb:
                 options |= SDWebImageRefreshCached;
@@ -196,14 +240,40 @@
         self.hasCompleted = NO;
         self.hasErrored = NO;
 
-        [self downloadImage: _source options: options context: context];
+        __weak typeof(self) weakSelf = self;
+        FFFastImageCompletionBlock completion = ^(UIImage* _Nullable image, NSError* _Nullable error) {
+            if (error) {
+                weakSelf.hasErrored = YES;
+                if (weakSelf.onFastImageError) {
+                    weakSelf.onFastImageError(@{});
+                }
+                if (weakSelf.onFastImageLoadEnd) {
+                    weakSelf.onFastImageLoadEnd(@{});
+                }
+            } else {
+                weakSelf.hasCompleted = YES;
+                [weakSelf setImage:image];
+                [weakSelf sendOnLoad:image];
+                if (weakSelf.onFastImageLoadEnd) {
+                    weakSelf.onFastImageLoadEnd(@{});
+                }
+            }
+        };
+
+        NSArray<FFFastImageCompletionBlock> *existingPromise = [[FFFastImageImageFetchStore shared] get:_source.url];
+        if (!existingPromise) {
+            [self downloadImage: _source options: options context: context];
+        }
+
+        // Add the completion to the store
+        [[FFFastImageImageFetchStore shared] add:_source.url completion:completion];
     } else if (_defaultSource) {
         [self setImage: _defaultSource];
     }
 }
 
 - (void) downloadImage: (FFFastImageSource*)source options: (SDWebImageOptions)options context: (SDWebImageContext*)context {
-    __weak typeof(self) weakSelf = self; // Always use a weak reference to self in blocks
+    __weak typeof(self) weakSelf = self;
     [self sd_setImageWithURL: _source.url
             placeholderImage: _defaultSource
                      options: options
@@ -215,26 +285,44 @@
                                     @"total": @(expectedSize)
                             });
                         }
-                    } completed: ^(UIImage* _Nullable image,
-                    NSError* _Nullable error,
-                    SDImageCacheType cacheType,
-                    NSURL* _Nullable imageURL) {
-                if (error) {
-                    weakSelf.hasErrored = YES;
-                    if (weakSelf.onFastImageError) {
-                        weakSelf.onFastImageError(@{});
                     }
-                    if (weakSelf.onFastImageLoadEnd) {
-                        weakSelf.onFastImageLoadEnd(@{});
-                    }
-                } else {
-                    weakSelf.hasCompleted = YES;
-                    [weakSelf sendOnLoad: image];
-                    if (weakSelf.onFastImageLoadEnd) {
-                        weakSelf.onFastImageLoadEnd(@{});
-                    }
-                }
-            }];
+                    completed: ^(UIImage* _Nullable image,
+                                NSError* _Nullable error,
+                                SDImageCacheType cacheType,
+                                NSURL* _Nullable imageURL) {
+                        // Fetch all the callbacks for this URL
+                        NSArray<FFFastImageCompletionBlock> *completions = [[FFFastImageImageFetchStore shared] get:_source.url];
+                        if (completions) {
+                            // Loop through all the completion callbacks and call them
+                            for (FFFastImageCompletionBlock completion in completions) {
+                                completion(image, error);
+                            }
+                            [[FFFastImageImageFetchStore shared] remove:_source.url];
+                        }
+                    }];
+}
+
+- (UIImage *)blurImage:(UIImage *)image withRadius:(CGFloat)radius {
+    CIContext *context = [CIContext contextWithOptions:nil];
+    CIImage *inputImage = [CIImage imageWithCGImage:image.CGImage];
+
+    CIFilter *filter = [CIFilter filterWithName:@"CIGaussianBlur"];
+    [filter setValue:inputImage forKey:kCIInputImageKey];
+    [filter setValue:[NSNumber numberWithFloat:radius] forKey:kCIInputRadiusKey];
+    CIImage *outputImage = [filter valueForKey:kCIOutputImageKey];
+
+    if (outputImage) {
+        CGRect rect = CGRectMake(radius * 2, radius * 2, image.size.width - radius * 4, image.size.height - radius * 4);
+        CGImageRef outputImageRef = [context createCGImage:outputImage fromRect:rect];
+
+        if (outputImageRef) {
+            UIImage *blurImage = [UIImage imageWithCGImage:outputImageRef];
+            CGImageRelease(outputImageRef);
+            return blurImage;
+        }
+    }
+
+    return nil;
 }
 
 - (void) dealloc {
