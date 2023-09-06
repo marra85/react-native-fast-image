@@ -1,7 +1,11 @@
 #import "FFFastImagePreloaderManager.h"
+#import "FFFastImageIgnoreURLParamsMapper.h"
 #import "FFFastImagePreloader.h"
 #import "FFFastImageSource.h"
-#import "SDWebImageDownloader.h"
+
+#import <SDWebImage/SDWebImageDownloader.h>
+#import <SDWebImage/SDImageCache.h>
+#import <SDWebImage/SDWebImagePrefetcher.h>
 
 @implementation FFFastImagePreloaderManager
 {
@@ -63,6 +67,7 @@ RCT_EXPORT_METHOD(createPreloader:(RCTPromiseResolveBlock)resolve rejecter:(RCTP
 }
 
 RCT_EXPORT_METHOD(preload:(nonnull NSNumber*)preloaderId sources:(nonnull NSArray<FFFastImageSource *> *)sources) {
+
     NSMutableArray *urls = [NSMutableArray arrayWithCapacity:sources.count];
     
     [sources enumerateObjectsUsingBlock:^(FFFastImageSource * _Nonnull source, NSUInteger idx, BOOL * _Nonnull stop) {
@@ -74,6 +79,20 @@ RCT_EXPORT_METHOD(preload:(nonnull NSNumber*)preloaderId sources:(nonnull NSArra
     
     FFFastImagePreloader* preloader = _preloaders[preloaderId];
     [preloader prefetchURLs:urls];
+}
+
+RCT_EXPORT_METHOD(clearMemoryCache:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+{
+    [SDImageCache.sharedImageCache clearMemory];
+    resolve(NULL);
+}
+
+RCT_EXPORT_METHOD(clearDiskCache:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+{
+    [FFFastImageIgnoreURLParamsMapper.shared clear];
+    [SDImageCache.sharedImageCache clearDiskOnCompletion:^(){
+        resolve(NULL);
+    }];
 }
 
 @end

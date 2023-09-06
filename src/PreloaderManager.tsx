@@ -80,6 +80,14 @@ class PreloaderManager {
             this._subComplete.remove()
         }
     }
+
+    async clearMemoryCache() {
+        nativeManager.clearMemoryCache()
+    }
+
+    async clearDiskCache() {
+        nativeManager.clearDiskCache()
+    }
 }
 
 const preloaderManager = new PreloaderManager()

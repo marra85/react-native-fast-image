@@ -21,6 +21,8 @@ declare class PreloaderManager {
     preload(sources: Source[], onProgress?: PreloadProgressHandler, onComplete?: PreloadCompletionHandler): void;
     onProgress({ id, finished, total }: OnProgressParams): void;
     onComplete({ id, finished, skipped }: OnCompleteParams): void;
+    clearMemoryCache(): Promise<void>;
+    clearDiskCache(): Promise<void>;
 }
 declare const preloaderManager: PreloaderManager;
 export default preloaderManager;

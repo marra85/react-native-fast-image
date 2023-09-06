@@ -1,7 +1,59 @@
 import _extends from '@babel/runtime/helpers/extends';
 import React, { forwardRef, memo } from 'react';
-import { NativeModules, StyleSheet, requireNativeComponent, Image, View, Platform } from 'react-native';
+import { NativeModules, NativeEventEmitter, Platform, StyleSheet, requireNativeComponent, Image, View } from 'react-native';
 
+const nativeManager = NativeModules.FastImagePreloaderManager;
+const nativeEmitter = new NativeEventEmitter(nativeManager);
+class PreloaderManager {
+  constructor() {
+    this._instances = new Map();
+    this._subProgress = void 0;
+    this._subComplete = void 0;
+  }
+  preload(sources, onProgress, onComplete) {
+    nativeManager.createPreloader().then(id => {
+      if (this._instances.size === 0) {
+        this._subProgress = nativeEmitter.addListener('fffastimage-progress', this.onProgress.bind(this));
+        this._subComplete = nativeEmitter.addListener('fffastimage-complete', this.onComplete.bind(this));
+      }
+      this._instances.set(id, {
+        onProgress,
+        onComplete
+      });
+      nativeManager.preload(id, sources);
+    });
+  }
+  onProgress({
+    id,
+    finished,
+    total
+  }) {
+    const instance = this._instances.get(id);
+    if (instance && instance.onProgress) instance.onProgress(finished, total);
+  }
+  onComplete({
+    id,
+    finished,
+    skipped
+  }) {
+    const instance = this._instances.get(id);
+    if (instance && instance.onComplete) instance.onComplete(finished, skipped);
+    this._instances.delete(id);
+    if (this._instances.size === 0 && this._subProgress && this._subComplete) {
+      this._subProgress.remove();
+      this._subComplete.remove();
+    }
+  }
+  async clearMemoryCache() {
+    nativeManager.clearMemoryCache();
+  }
+  async clearDiskCache() {
+    nativeManager.clearDiskCache();
+  }
+}
+const preloaderManager = new PreloaderManager();
+
+const FastImageViewNativeModule = Platform.OS === 'ios' ? preloaderManager : NativeModules.FastImageView;
 const resizeMode = {
   contain: 'contain',
   cover: 'cover',
@@ -107,9 +159,9 @@ const FastImage = FastImageComponent;
 FastImage.resizeMode = resizeMode;
 FastImage.cacheControl = cacheControl;
 FastImage.priority = priority;
-FastImage.preload = sources => NativeModules.FastImageView.preload(sources);
-FastImage.clearMemoryCache = () => NativeModules.FastImageView.clearMemoryCache();
-FastImage.clearDiskCache = () => NativeModules.FastImageView.clearDiskCache();
+FastImage.preload = (sources, onProgress, onComplete) => FastImageViewNativeModule.preload(sources, onProgress, onComplete);
+FastImage.clearMemoryCache = () => FastImageViewNativeModule.clearMemoryCache();
+FastImage.clearDiskCache = () => FastImageViewNativeModule.clearDiskCache();
 const styles = StyleSheet.create({
   imageContainer: {
     overflow: 'hidden'

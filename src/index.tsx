@@ -17,6 +17,8 @@ import {
 	requireNativeComponent,
 } from 'react-native'
 
+import PreloaderManager from './PreloaderManager'
+
 export type ResizeMode = 'contain' | 'cover' | 'stretch' | 'center'
 
 const resizeMode = {
@@ -262,11 +264,15 @@ FastImage.cacheControl = cacheControl
 
 FastImage.priority = priority
 
-FastImage.preload = (sources: Source[]) => NativeModules.FastImageView.preload(sources)
+FastImage.preload = (
+    sources: Source[],
+    onProgress?: PreloadProgressHandler,
+    onComplete?: PreloadCompletionHandler,
+) => PreloaderManager.preload(sources, onProgress, onComplete)
 
-FastImage.clearMemoryCache = () => NativeModules.FastImageView.clearMemoryCache()
+FastImage.clearMemoryCache = () => PreloaderManager.clearMemoryCache()
 
-FastImage.clearDiskCache = () => NativeModules.FastImageView.clearDiskCache()
+FastImage.clearDiskCache = () => PreloaderManager.clearDiskCache()
 
 const styles = StyleSheet.create({
 	imageContainer: {
