@@ -67,14 +67,19 @@ RCT_EXPORT_METHOD(createPreloader:(RCTPromiseResolveBlock)resolve rejecter:(RCTP
 }
 
 RCT_EXPORT_METHOD(preload:(nonnull NSNumber*)preloaderId sources:(nonnull NSArray<FFFastImageSource *> *)sources) {
-
-    NSMutableArray *urls = [NSMutableArray arrayWithCapacity:sources.count];
+    // we init an empty list instead of using the sources index to exclude possible errors
+    // passed in the sources (empty urls)
+    NSMutableArray *urls = [[NSMutableArray alloc] init];
     
     [sources enumerateObjectsUsingBlock:^(FFFastImageSource * _Nonnull source, NSUInteger idx, BOOL * _Nonnull stop) {
-        [source.headers enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSString* header, BOOL *stop) {
-            [[SDWebImageDownloader sharedDownloader] setValue:header forHTTPHeaderField:key];
-        }];
-        [urls setObject:source.url atIndexedSubscript:idx];
+        if (source.url) {
+            // adds all the headers for the current source, if available
+            [source.headers enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSString* header, BOOL *stop) {
+                [[SDWebImageDownloader sharedDownloader] setValue:header forHTTPHeaderField:key];
+            }];
+            // once done, insert the url in the download queue
+            [urls addObject: source.url];
+        }
     }];
     
     FFFastImagePreloader* preloader = _preloaders[preloaderId];
